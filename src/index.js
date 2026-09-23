@@ -29,6 +29,13 @@ export default {
       const fileBody = await request.arrayBuffer();
       const contentType =
         request.headers.get("Content-Type") || "application/octet-stream";
+      const iv = request.headers.get("X-Encryption-IV");
+
+      if (!iv) {
+        return new Response("Missing encryption IV", {
+          status: 400,
+        });
+      }
 
       let id;
       let attempts = 0;
@@ -58,6 +65,7 @@ export default {
         method: "PUT",
         headers: {
           "Content-Type": contentType,
+          "x-amz-meta-iv": iv,
         },
         body: fileBody,
       });
@@ -93,12 +101,130 @@ export default {
       const fileData = await getRes.arrayBuffer();
       const contentType =
         getRes.headers.get("Content-Type") || "application/octet-stream";
+      const iv = getRes.headers.get("x-amz-meta-iv");
 
-      const deleteUrl = `${B2_ENDPOINT}/${B2_BUCKET}/${id}`;
-      await client.fetch(deleteUrl, { method: "DELETE" });
+      if (!iv) {
+        return new Response("Missing encryption IV", {
+          status: 500,
+        });
+      }
+
+      const accept = request.headers.get("Accept") || "";
+
+      if (accept.includes("text/html")) {
+        const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>temp</title>
+  </head>
+  <body>
+    <script>
+      async function deriveKeyFromChar(char) {
+        const encoder = new TextEncoder();
+        const hash = await crypto.subtle.digest(
+          "SHA-256",
+          encoder.encode(char),
+        );
+        return crypto.subtle.importKey("raw", hash, "AES-GCM", false, [
+          "encrypt",
+          "decrypt",
+        ]);
+      }
+
+      function base64UrlToBuf(str) {
+        const binary = atob(
+          str.replace(/-/g, "+").replace(/_/g, "/") +
+            "=".repeat((4 - (str.length % 4)) % 4),
+        );
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
+
+      async function loadFile() {
+        const keyChar = location.hash.substring(1);
+
+        if (!keyChar) {
+          document.body.textContent = "Invalid link.";
+          return;
+        }
+
+        const res = await fetch(location.pathname);
+
+        if (!res.ok) {
+          document.body.textContent = "Media has expired or does not exist.";
+          return;
+        }
+
+        const iv = base64UrlToBuf(res.headers.get("X-Encryption-IV"));
+        const encrypted = await res.arrayBuffer();
+        const key = await deriveKeyFromChar(keyChar);
+
+        try {
+          const decrypted = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv },
+            key,
+            encrypted,
+          );
+
+          const type =
+            res.headers.get("X-Original-Content-Type") ||
+            "application/octet-stream";
+
+          const blob = new Blob([decrypted], { type });
+          const url = URL.createObjectURL(blob);
+
+          if (type.startsWith("image/")) {
+            const img = document.createElement("img");
+            img.src = url;
+            document.body.appendChild(img);
+          } else if (type.startsWith("video/")) {
+            const video = document.createElement("video");
+            video.src = url;
+            video.controls = true;
+            document.body.appendChild(video);
+          } else if (type.startsWith("audio/")) {
+            const audio = document.createElement("audio");
+            audio.src = url;
+            audio.controls = true;
+            document.body.appendChild(audio);
+          } else {
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "file";
+            link.textContent = "Download file";
+            document.body.appendChild(link);
+          }
+        } catch {
+          document.body.textContent = "Invalid encryption key.";
+        }
+      }
+
+      loadFile();
+    </script>
+  </body>
+</html>`;
+
+        return new Response(html, {
+          headers: {
+            "Content-Type": "text/html",
+          },
+        });
+      }
+
+      await client.fetch(getUrl, { method: "DELETE" });
 
       return new Response(fileData, {
-        headers: { "Content-Type": contentType },
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Encryption-IV": iv,
+          "X-Original-Content-Type": contentType,
+          "Access-Control-Expose-Headers":
+            "X-Encryption-IV, X-Original-Content-Type",
+        },
       });
     }
 
