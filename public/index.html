@@ -11,5 +11,31 @@
       <button type="submit">Upload</button>
     </form>
     <p id="result"></p>
+
+    <script>
+      document
+        .getElementById("uploadForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const file = document.getElementById("fileInput").files[0];
+          const resultEl = document.getElementById("result");
+
+          resultEl.textContent = "Uploading...";
+
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            body: file,
+          });
+
+          if (!res.ok) {
+            resultEl.textContent = "Upload failed.";
+            return;
+          }
+
+          const data = await res.json();
+          resultEl.textContent =
+            "Link: " + location.origin + "/view/" + data.id;
+        });
+    </script>
   </body>
 </html>
