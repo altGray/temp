@@ -11,6 +11,7 @@
       <button type="submit">Upload</button>
     </form>
     <p id="result"></p>
+    <button id="copyBtn" style="display: none">Copy Link</button>
 
     <script>
       document
@@ -36,7 +37,18 @@
           }
 
           const data = await res.json();
-          resultEl.textContent = "Link: " + location.origin + "/v/" + data.id;
+          const link = location.origin + "/v/" + data.id;
+          resultEl.textContent = "Link: " + link;
+
+          const copyBtn = document.getElementById("copyBtn");
+          copyBtn.style.display = "inline-block";
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(link);
+            copyBtn.textContent = "Copied!";
+            setTimeout(() => {
+              copyBtn.textContent = "Copy Link";
+            }, 1500);
+          };
         });
     </script>
   </body>
