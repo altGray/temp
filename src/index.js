@@ -30,6 +30,8 @@ export default {
       });
 
       if (!putRes.ok) {
+        const errorText = await putRes.text();
+        console.log("B2 PUT failed:", putRes.status, errorText);
         return new Response("Upload failed", { status: 500 });
       }
 
