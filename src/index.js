@@ -40,6 +40,35 @@ export default {
       });
     }
 
+    if (url.pathname.startsWith("/view/") && request.method === "GET") {
+      const id = url.pathname.replace("/view/", "");
+
+      const client = new AwsClient({
+        accessKeyId: env.B2_KEY_ID,
+        secretAccessKey: env.B2_APPLICATION_KEY,
+      });
+
+      const getUrl = `${B2_ENDPOINT}/${B2_BUCKET}/${id}`;
+      const getRes = await client.fetch(getUrl, { method: "GET" });
+
+      if (!getRes.ok) {
+        return new Response("Media has expired or does not exist", {
+          status: 410,
+        });
+      }
+
+      const fileData = await getRes.arrayBuffer();
+      const contentType =
+        getRes.headers.get("Content-Type") || "application/octet-stream";
+
+      const deleteUrl = `${B2_ENDPOINT}/${B2_BUCKET}/${id}`;
+      await client.fetch(deleteUrl, { method: "DELETE" });
+
+      return new Response(fileData, {
+        headers: { "Content-Type": contentType },
+      });
+    }
+
     return env.ASSETS.fetch(request);
   },
 };
