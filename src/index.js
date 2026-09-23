@@ -22,10 +22,15 @@ export default {
 
       const id = randomId();
       const fileBody = await request.arrayBuffer();
+      const contentType =
+        request.headers.get("Content-Type") || "application/octet-stream";
 
       const putUrl = `${B2_ENDPOINT}/${B2_BUCKET}/${id}`;
       const putRes = await client.fetch(putUrl, {
         method: "PUT",
+        headers: {
+          "Content-Type": contentType,
+        },
         body: fileBody,
       });
 

@@ -24,6 +24,9 @@
 
           const res = await fetch("/api/upload", {
             method: "POST",
+            headers: {
+              "Content-Type": file.type || "application/octet-stream",
+            },
             body: file,
           });
 
