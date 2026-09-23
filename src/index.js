@@ -3,8 +3,14 @@ import { AwsClient } from "aws4fetch";
 const B2_ENDPOINT = "https://s3.eu-central-003.backblazeb2.com";
 const B2_BUCKET = "temp-media";
 
+const ID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
+
 function randomId() {
-  return crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+  let id = "";
+  for (let i = 0; i < 4; i++) {
+    id += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
+  }
+  return id;
 }
 
 export default {
@@ -20,10 +26,32 @@ export default {
         secretAccessKey: env.B2_APPLICATION_KEY,
       });
 
-      const id = randomId();
       const fileBody = await request.arrayBuffer();
       const contentType =
         request.headers.get("Content-Type") || "application/octet-stream";
+
+      let id;
+      let attempts = 0;
+      const maxAttempts = 5;
+
+      while (attempts < maxAttempts) {
+        const candidateId = randomId();
+        const checkUrl = `${B2_ENDPOINT}/${B2_BUCKET}/${candidateId}`;
+        const checkRes = await client.fetch(checkUrl, { method: "HEAD" });
+
+        if (!checkRes.ok) {
+          id = candidateId;
+          break;
+        }
+
+        attempts++;
+      }
+
+      if (!id) {
+        return new Response("Could not generate a unique ID, try again", {
+          status: 500,
+        });
+      }
 
       const putUrl = `${B2_ENDPOINT}/${B2_BUCKET}/${id}`;
       const putRes = await client.fetch(putUrl, {
@@ -45,8 +73,8 @@ export default {
       });
     }
 
-    if (url.pathname.startsWith("/view/") && request.method === "GET") {
-      const id = url.pathname.replace("/view/", "");
+    if (url.pathname.startsWith("/v/") && request.method === "GET") {
+      const id = url.pathname.replace("/v/", "");
 
       const client = new AwsClient({
         accessKeyId: env.B2_KEY_ID,

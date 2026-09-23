@@ -36,8 +36,7 @@
           }
 
           const data = await res.json();
-          resultEl.textContent =
-            "Link: " + location.origin + "/view/" + data.id;
+          resultEl.textContent = "Link: " + location.origin + "/v/" + data.id;
         });
     </script>
   </body>
