@@ -12,6 +12,9 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/api/upload" && request.method === "POST") {
+      console.log("B2_KEY_ID present:", !!env.B2_KEY_ID);
+      console.log("B2_APPLICATION_KEY present:", !!env.B2_APPLICATION_KEY);
+
       const client = new AwsClient({
         accessKeyId: env.B2_KEY_ID,
         secretAccessKey: env.B2_APPLICATION_KEY,
